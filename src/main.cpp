@@ -26,13 +26,9 @@
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 // WiFi
-// Home
-const char* ssid = "UWB_Network";
-const char* password = "123456789";
-
 // iPhone
-//const char* ssid = "iPhone";
-//const char* password = "3@Worldquest!";
+//const char* ssid = "";
+//const char* password = "";
 
 // Networking
 const char* server = "192.168.10.100";
