@@ -27,11 +27,11 @@
 
 // WiFi
 // iPhone
-//const char* ssid = "";
-//const char* password = "";
+const char* ssid = "";
+const char* password = "";
 
 // Networking
-const char* server = "192.168.10.100";
+//const char* server = "192.168.10.100";
 WiFiClient espClient;
 PubSubClient client(espClient);
 unsigned long timeStampAccel = millis();
@@ -52,7 +52,6 @@ Pedometer pedometer = Pedometer(accelgyro);
 Oximeter oximeter = Oximeter();
 
 int16_t ax, ay, az;
-int16_t gx, gy, gz;
 
 float accel_x, accel_y, accel_z;
 
@@ -257,9 +256,9 @@ void setup()
 
   //Connect tow WiFi
   //scanNetworks();
-  connectToNetwork();
-  Serial.print("Mac Address: ") ;Serial.println(WiFi.macAddress());
-  Serial.print("IP: "); Serial.println(WiFi.localIP());
+  //connectToNetwork();
+  //Serial.print("Mac Address: ") ;Serial.println(WiFi.macAddress());
+  //Serial.print("IP: "); Serial.println(WiFi.localIP());
   
   // Grab time
   //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
@@ -279,21 +278,21 @@ void setup()
   //}
 
   // Connect to mqtt
-  client.setServer(server, 1883);
+  //client.setServer(server, 1883);
 }
 
 void loop() {
-  if (!client.connected()) {
-    reconnect();
-  }
-  client.loop();
+  //if (!client.connected()) {
+  //  reconnect();
+ // }
+  //client.loop();
 
   // Toggle between recording state and non-recording state
-  recordButttonState();
+  //recordButttonState();
 
   // read raw accel/gyro measurements from device
   if (accelgyro.testConnection()){
-    accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+    //accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
     // display tab-separated accel/gyro x/y/z values
     //Serial.print(float(ax/ACCEL_FULL_SCALE_RANGE)); Serial.print("\t");
     //Serial.print(float(ay/ACCEL_FULL_SCALE_RANGE)); Serial.print("\t");
@@ -301,13 +300,13 @@ void loop() {
     //Serial.print(float(gx/GYRO_FULL_SCALE_RANGE)); Serial.print("\t");
     //Serial.print(float(gy/GYRO_FULL_SCALE_RANGE)); Serial.print("\t");
     //Serial.println(float(gz/GYRO_FULL_SCALE_RANGE));
-    accel_x = float(ax/ACCEL_FULL_SCALE_RANGE);
-    accel_y = float(ay/ACCEL_FULL_SCALE_RANGE);
-    accel_z = float(az/ACCEL_FULL_SCALE_RANGE);
+    //accel_x = float(ax/ACCEL_FULL_SCALE_RANGE);
+    //accel_y = float(ay/ACCEL_FULL_SCALE_RANGE);
+    //accel_z = float(az/ACCEL_FULL_SCALE_RANGE);
+    //sendAccel(accel_x, accel_y, accel_z);
 
-    if (recordingState){
-      sendAccel(accel_x, accel_y, accel_z);
-    }
+    int steps = pedometer.count_steps();
+    Serial.print("Steps: "); Serial.println(steps);
   }
   //Serial.print("X:"); Serial.print(accel_x); Serial.print(" ");
   //Serial.print("Y:"); Serial.print(accel_y); Serial.print(" ");
@@ -333,10 +332,10 @@ void loop() {
   //Serial.print(" IR Voltage Value: "); Serial.print(analogIR); Serial.println("mV");
 
   // Battery
-  float voltage = tp.GetBatteryVoltage();
-  sendDevice(voltage, recordingState);
+  //float voltage = tp.GetBatteryVoltage();
+  //sendDevice(voltage, recordingState);
   
-  delay(50);
+  delay(100);
 
   // Display time
   //getTimeUpdate(3600);
