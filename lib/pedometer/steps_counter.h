@@ -21,7 +21,14 @@ class Pedometer{
         void autocorrelation(float* accel_mean, float* accel_corr);
         void deriative(float* accel_corr, float* accel_der);
         int find_peaks(float* accel_der);
+        
         MPU6050 accelgyro;
+        // Arrays
+        float accel_lpf[SAMPLES] = {};
+        float accel_mean[SAMPLES] = {};
+        float accel_corr[NUM_AUTOCORR_LAGS] = {};
+        float accel_der[NUM_AUTOCORR_LAGS] = {};
+
     public:
         Pedometer(MPU6050 accelgyro);
         int count_steps();

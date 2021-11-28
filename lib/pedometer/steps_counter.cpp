@@ -94,12 +94,6 @@ int Pedometer::count_steps(){
         accelz = float(az / 16384.0);
         accel_mag[i] = sqrt(pow(accelx, 2) + pow(accely, 2) + pow(accelz, 2));
     }
-    
-    // Arrays
-    float accel_lpf[SAMPLES] = {};
-    float accel_mean[SAMPLES] = {};
-    float accel_corr[NUM_AUTOCORR_LAGS] = {};
-    float accel_der[NUM_AUTOCORR_LAGS] = {};
 
     // Apply low pass filter
     low_pass_filter(accel_mag, accel_lpf);
@@ -114,6 +108,5 @@ int Pedometer::count_steps(){
     deriative(accel_corr, accel_der);
 
     // Find peaks
-    //return find_peaks(accel_der);
-    return 0;
+    return find_peaks(accel_der);
 }

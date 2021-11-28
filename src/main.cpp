@@ -9,6 +9,7 @@
 #include <MPU6050.h>
 #include <steps_counter.h>
 #include <optical_oximeter.h>
+#include <FreeRTOS.h>
 
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
@@ -25,8 +26,10 @@
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
+// Task Stack Size
+# define STACK_SIZE 1024
+
 // WiFi
-// iPhone
 const char* ssid = "";
 const char* password = "";
 
@@ -54,6 +57,13 @@ Oximeter oximeter = Oximeter();
 int16_t ax, ay, az;
 
 float accel_x, accel_y, accel_z;
+
+// Global Step Counter Variables
+int steps = 0;          // Tracks the current number of user steps
+int prior_steps = 0;    // Tracks number of steps from last sampling period 
+int current_steps = 0;  // Tracks number of steps from current sampling period
+
+// Global Oximeter Sensor Variable
 
 const int RedPin = 4;
 const int IRPin = 5;
@@ -281,6 +291,16 @@ void setup()
   //client.setServer(server, 1883);
 }
 
+void UpdateStepTask(void *pvParameters){
+  if (accelgyro.testConnection()){
+    unsigned long StartTime = millis();
+    unsigned long ElapsedTime = 0;
+    current_steps = pedometer.count_steps();
+    ElapsedTime = millis() - StartTime;
+    steps = ((current_steps + prior_steps)/2)*10;    // Steps are sampled very 10 seconds 
+  }
+}
+
 void loop() {
   //if (!client.connected()) {
   //  reconnect();
@@ -290,31 +310,12 @@ void loop() {
   // Toggle between recording state and non-recording state
   //recordButttonState();
 
-  // read raw accel/gyro measurements from device
-  if (accelgyro.testConnection()){
-    //accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-    // display tab-separated accel/gyro x/y/z values
-    //Serial.print(float(ax/ACCEL_FULL_SCALE_RANGE)); Serial.print("\t");
-    //Serial.print(float(ay/ACCEL_FULL_SCALE_RANGE)); Serial.print("\t");
-    //Serial.print(float(az/ACCEL_FULL_SCALE_RANGE)); Serial.print("\t");
-    //Serial.print(float(gx/GYRO_FULL_SCALE_RANGE)); Serial.print("\t");
-    //Serial.print(float(gy/GYRO_FULL_SCALE_RANGE)); Serial.print("\t");
-    //Serial.println(float(gz/GYRO_FULL_SCALE_RANGE));
-    //accel_x = float(ax/ACCEL_FULL_SCALE_RANGE);
-    //accel_y = float(ay/ACCEL_FULL_SCALE_RANGE);
-    //accel_z = float(az/ACCEL_FULL_SCALE_RANGE);
-    //sendAccel(accel_x, accel_y, accel_z);
+  //  get step measurements from device
 
-    int steps = pedometer.count_steps();
-    Serial.print("Steps: "); Serial.println(steps);
-  }
   //Serial.print("X:"); Serial.print(accel_x); Serial.print(" ");
   //Serial.print("Y:"); Serial.print(accel_y); Serial.print(" ");
   //Serial.print("Z:"); Serial.println(accel_z); 
 
-
-  //int steps = pedometer.count_steps();
-  //Serial.println(steps);
   
   //int brightnessRed = (int)(pow(2, RedResolution)-1);
   //int brightnessIR = (int)(pow(2, IRResolution)-1);
@@ -334,8 +335,6 @@ void loop() {
   // Battery
   //float voltage = tp.GetBatteryVoltage();
   //sendDevice(voltage, recordingState);
-  
-  delay(100);
 
   // Display time
   //getTimeUpdate(3600);
