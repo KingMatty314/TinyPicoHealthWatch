@@ -3,10 +3,10 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <I2Cdev.h>
-#include <MPU6050.h>
+#include <math.h>
 
 // These values need to be tunned
+#define PI 3.141592653589793238
 #define SAMPLING_FREQ 20
 #define SAMPLING_PER 0.05
 #define SAMPLES 600
@@ -19,19 +19,22 @@ class Pedometer{
         void low_pass_filter(float* accel_mag, float* accel_lpf);
         void remove_mean_filter(float* accel_lpf, float* accel_mean);
         void autocorrelation(float* accel_mean, float* accel_corr);
-        void deriative(float* accel_corr, float* accel_der);
+        void derivative(float* accel_corr, float* accel_der);
         int find_peaks(float* accel_der);
-        
-        MPU6050 accelgyro;
+
         // Arrays
+        int16_t index = 0;
+        float accel_buffer[SAMPLES] = {};
         float accel_lpf[SAMPLES] = {};
         float accel_mean[SAMPLES] = {};
         float accel_corr[NUM_AUTOCORR_LAGS] = {};
         float accel_der[NUM_AUTOCORR_LAGS] = {};
 
     public:
-        Pedometer(MPU6050 accelgyro);
-        int count_steps();
+        Pedometer();
+        void add_data(float ax, float ay, float az);
+        bool is_buffer_full();
+        int get_count_steps();
 };
 
 #endif

@@ -1,8 +1,7 @@
 #include <steps_counter.h>
 #include <math.h>
 
-Pedometer::Pedometer(MPU6050 mpu){
-    accelgyro = mpu;
+Pedometer::Pedometer(){
 }
 
 void Pedometer::low_pass_filter(float* accel_mag, float* accel_lpf){
@@ -42,7 +41,7 @@ void Pedometer::autocorrelation(float* accel_mean, float* accel_corr){
     }
 }
 
-void Pedometer::deriative(float* accel_corr, float* accel_der){
+void Pedometer::derivative(float* accel_corr, float* accel_der){
     for (int i = 0; i < NUM_AUTOCORR_LAGS - 1; i++)
     {
         accel_der[i] = (accel_corr[i+1] - accel_corr[i]) / SAMPLING_PER;
@@ -78,25 +77,29 @@ int Pedometer::find_peaks(float* accel_der){
     return peaks;
 }
 
+void Pedometer::add_data(float ax, float ay, float az){
+    if (!is_buffer_full){
+        accel_buffer[index] = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
+        index += 1;
+    }
+}
 
-int Pedometer::count_steps(){
-    int16_t ax, ay, az, gx, gy, gz;
-    float accelx, accely, accelz;
+bool Pedometer::is_buffer_full(){
+    if (index >= SAMPLES)
+        return true;
+    else
+        return false;
+}
 
-    float accel_mag[SAMPLES] = {};
-    
-    // Collect Data Samples
-    for (int i = 0; i < SAMPLES; i++)
-    {
-        accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-        accelx = float(ax / 16384.0);
-        accely = float(ay / 16384.0);
-        accelz = float(az / 16384.0);
-        accel_mag[i] = sqrt(pow(accelx, 2) + pow(accely, 2) + pow(accelz, 2));
+
+int Pedometer::get_count_steps(){
+    // Check buffer size
+    if(!is_buffer_full()){
+        return 0;
     }
 
     // Apply low pass filter
-    low_pass_filter(accel_mag, accel_lpf);
+    low_pass_filter(accel_buffer, accel_lpf);
 
     // Apply mean filter
     remove_mean_filter(accel_lpf, accel_mean);
@@ -104,8 +107,11 @@ int Pedometer::count_steps(){
     // Apply correlation alogrithm
     autocorrelation(accel_mean, accel_corr);
     
-    // Apply deriative
-    deriative(accel_corr, accel_der);
+    // Apply derivative
+    derivative(accel_corr, accel_der);
+
+    // Reset buffer index
+    index = 0;
 
     // Find peaks
     return find_peaks(accel_der);

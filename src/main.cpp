@@ -1,15 +1,12 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <time.h>
-#include <TinyPICO.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
-#include <steps_counter.h>
 #include <MAX30105.h>
 #include <FreeRTOS.h>
 #include <stdio.h>
-#include <esp32-hal-cpu.h>
+#include <steps_counter.h>
 
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
@@ -37,25 +34,11 @@ const char* password = "123456789";
 const char* server = "192.168.10.100";
 WiFiClient espClient;
 PubSubClient client(espClient);
-unsigned long timeStampAccel = millis();
-unsigned long timeStampOximeter = millis();
 
-
-// Time 
-unsigned long lastNTPtime;
-unsigned long lastEntryTime;
-tm timeinfo;
-time_t now;
-
-// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-//TinyPICO tp = TinyPICO();
 MPU6050 accelgyro;
-//Pedometer pedometer = Pedometer(accelgyro);
+Pedometer pedometer = Pedometer();
 MAX30105 oximeterSensor;
 
-int16_t ax, ay, az, gx, gy, gz;
-
-float accel_x, accel_y, accel_z;
 
 // Global Step Counter Variables
 int steps = 0;          // Tracks the current number of user steps
@@ -169,7 +152,6 @@ void reconnect() {
 */
 void setup() 
 {
-  setCpuFrequencyMhz(80);
   Serial.begin(115200);
   // Setup push button
   pinMode(ButtonPin, INPUT);
@@ -279,14 +261,15 @@ void ListenBrokerSubsriberData(void *pvParameter){
 */
 
 void loop() {
-  // Toggle between recording state and non-recording state
-  //recordButttonState();
-  //if (recordingState){
-  //  Serial.println("Recording State Active");
-  //} else {
-  //  Serial.println("Normal Display Active");
- // }
+  recordButttonState();
+  if (recordingState){
+    Serial.println("Recording State Active");
+  } else {
+    Serial.println("Normal Display Active");
+  }
   
+
+  // oximeter sample frequency 50Hz
   oximeterSensor.check();
   while (oximeterSensor.available()){
     int32_t red = oximeterSensor.getFIFORed();
@@ -297,12 +280,19 @@ void loop() {
     // read next set of samples
     oximeterSensor.nextSample();  
   }
-  
+
+  // accelometer sample frequency 20Hz
+  float accelx, accely, accelz;
+  int16_t ax, ay, az, gx, gy, gz;
+  accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  accelx = float(ax / 16384.0);
+  accely = float(ay / 16384.0);
+  accelz = float(az / 16384.0);
+  pedometer.add_data(accelx, accely, accelz);
+
+  // Check if buffers are full?
 
 
-
-  // Battery
-  //float voltage = tp.GetBatteryVoltage();
   //sendDevice(voltage, recordingState);
 
   // Display time
@@ -310,7 +300,5 @@ void loop() {
   //printLocalTime();
   //updateMainDisplay();
 
-
-  //ListenBrokerSubsriberData();
-  delay(20);
+  delay(10);
 }
