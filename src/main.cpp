@@ -2,11 +2,13 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <I2Cdev.h>
-#include <MPU6050.h>
-#include <MAX30105.h>
 #include <FreeRTOS.h>
 #include <stdio.h>
+#include <MPU6050.h>
+#include <MAX30105.h>
 #include <steps_counter.h>
+#include <heart_rate.h>
+#include <spO2.h>
 
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
@@ -14,14 +16,6 @@
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
 #endif
-
-// Define LSB Sensitivity
-#define ACCEL_FULL_SCALE_RANGE 16384.0
-#define GYRO_FULL_SCALE_RANGE 131.0
-
-// Screen Size
-#define SCREEN_WIDTH 128 // OLED display width, in pixels
-#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 // Task Stack Size
 # define STACK_SIZE 1024
@@ -35,20 +29,17 @@ const char* server = "192.168.10.100";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-MPU6050 accelgyro;
-Pedometer pedometer = Pedometer();
-MAX30105 oximeterSensor;
+MPU6050 accelgyro;                        // Accelemeter Sensor
+MAX30105 oximeterSensor;                  // Oximeter Sensor
+Pedometer pedometer = Pedometer();        // Pedometer
+HeartRate heartrate = HeartRate();        // Heartrate
+Oxygenation oxygenation = Oxygenation();  // Oxygenation
 
-
-// Global Step Counter Variables
-int steps = 0;          // Tracks the current number of user steps
-int prior_steps = 0;    // Tracks number of steps from last sampling period 
-int current_steps = 0;  // Tracks number of steps from current sampling period
-
-// Global Oximeter Sensor Variable
-
+// Constants
 const int ButtonPin = 14;
 bool recordingState = false;
+const int RedLightThreshold = 30000;
+const int IRLightThreshold = 50000;
 
 void recordButttonState()
 {
@@ -261,44 +252,72 @@ void ListenBrokerSubsriberData(void *pvParameter){
 */
 
 void loop() {
-  recordButttonState();
-  if (recordingState){
-    Serial.println("Recording State Active");
-  } else {
-    Serial.println("Normal Display Active");
-  }
-  
-
-  // oximeter sample frequency 50Hz
-  oximeterSensor.check();
-  while (oximeterSensor.available()){
-    int32_t red = oximeterSensor.getFIFORed();
-    int32_t ir = oximeterSensor.getFIFOIR();
-    if (red >50000){
-      Serial.print(red); Serial.print(", "); Serial.println(ir);
-    }
-    // read next set of samples
-    oximeterSensor.nextSample();  
-  }
-
-  // accelometer sample frequency 20Hz
   float accelx, accely, accelz;
   int16_t ax, ay, az, gx, gy, gz;
-  accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  accelx = float(ax / 16384.0);
-  accely = float(ay / 16384.0);
-  accelz = float(az / 16384.0);
-  pedometer.add_data(accelx, accely, accelz);
+  int32_t red;
+  int32_t ir;
+  int steps = 0;
+  int heartbeat = 0;
+  int oxyg = 0;
+  int temp = 0;
+  while (true){
+    recordButttonState();
 
-  // Check if buffers are full?
+    // oximeter sample frequency 50Hz
+    oximeterSensor.check();
+    while (oximeterSensor.available()){
+      red = oximeterSensor.getFIFORed();
+      ir = oximeterSensor.getFIFOIR();
+      temp = oximeterSensor.readTemperature();
+      if (red > RedLightThreshold && ir > IRLightThreshold){
+        // light is above threshold save
+        heartrate.add_data(ir);
+        oxygenation.add_data(ir, red);
+      } else {
+        // light is under threshold reset buffer
+        heartrate.clear_data();
+        oxygenation.clear_data();
+      }
+      // read next set of samples
+      oximeterSensor.nextSample();  
+    }
+
+    // accelometer sample frequency 20Hz
+    if (accelgyro.testConnection()){
+      accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+      accelx = float(ax / 16384.0);
+      accely = float(ay / 16384.0);
+      accelz = float(az / 16384.0);
+      pedometer.add_data(accelx, accely, accelz);
+    }
+
+    // Check if buffers are full
+    if (heartrate.is_buffer_full())
+      heartbeat = heartrate.get_heart_rate();
+    
+    if (oxygenation.is_buffer_full()){
+      oxyg = oxygenation.get_oxygenation();
+    }
+
+    if (pedometer.is_buffer_full()){
+      steps += pedometer.get_count_steps();
+    }
+
+    // Data Fusion Algorthm
+    // Activtity = DataFusion(heartbeat, temp, steps_delta)
+    
+    // Send Data Over in queue Networking communication task.
 
 
-  //sendDevice(voltage, recordingState);
+    ///////////  Print Data /////////////////
+    // Debug comment once done.
+    Serial.print("accelx: "); Serial.print(accelx); Serial.print(" accely: "); Serial.print(accely); Serial.print(" accelz: "); Serial.print(accelz);
+    Serial.print(" ir: "); Serial.print(ir); Serial.print(" red: "); Serial.print(red); Serial.print(" temp: "); Serial.println(temp);
+    Serial.print("Steps: "); Serial.print(steps); Serial.print(" HB: "); Serial.print(heartbeat); Serial.print(" O2: "); Serial.println(oxyg);
+    Serial.print("Device State: "); Serial.println(recordingState);
+    Serial.print("Buffer Index: "); Serial.println(heartrate.get_buffer_index());
+    Serial.println();
 
-  // Display time
-  //getTimeUpdate(3600);
-  //printLocalTime();
-  //updateMainDisplay();
-
-  delay(10);
+    delay(100);
+  }
 }

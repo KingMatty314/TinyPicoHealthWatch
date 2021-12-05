@@ -22,8 +22,10 @@ class Pedometer{
         void derivative(float* accel_corr, float* accel_der);
         int find_peaks(float* accel_der);
 
+        // Buffer Index
+        int index = 0;
+
         // Arrays
-        int16_t index = 0;
         float accel_buffer[SAMPLES] = {};
         float accel_lpf[SAMPLES] = {};
         float accel_mean[SAMPLES] = {};

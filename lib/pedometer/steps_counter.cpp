@@ -78,7 +78,7 @@ int Pedometer::find_peaks(float* accel_der){
 }
 
 void Pedometer::add_data(float ax, float ay, float az){
-    if (!is_buffer_full){
+    if (!is_buffer_full()){
         accel_buffer[index] = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
         index += 1;
     }
@@ -93,11 +93,6 @@ bool Pedometer::is_buffer_full(){
 
 
 int Pedometer::get_count_steps(){
-    // Check buffer size
-    if(!is_buffer_full()){
-        return 0;
-    }
-
     // Apply low pass filter
     low_pass_filter(accel_buffer, accel_lpf);
 
