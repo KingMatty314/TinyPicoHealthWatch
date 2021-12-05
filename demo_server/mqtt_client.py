@@ -1,3 +1,4 @@
+import random
 import time
 import pandas as pd
 import threading, datetime, calendar
@@ -104,14 +105,81 @@ class mqttPub(mqtt.Client):
             self.publish("esp32watch/data/time/month", month)
             self.publish("esp32watch/data/time/day", str(day))
             self.publish("esp32watch/data/time/year", str(year))
-            time.sleep(10000)
+            time.sleep(100)
+
+# tesing web page and mqtt system with articial values
+class testWebPageActivityData(mqtt.Client):
+    def on_connect(self, mqttc, obj, flags, rc):
+        print("rc: "+str(rc))
+
+    def on_connect_fail(self, mqttc, obj):
+        print("Connect failed")
+
+    def on_publish(self, mqttc, obj, mid):
+        print("message published, id: " + str(mid))
+
+    def run(self):
+        self.connect("127.0.0.1", 1883, 60)
+        steps = 0
+        heartbeat = 80
+        sp02 = 99
+        activity = "walking"
+        battery = 3.7
+        while True:
+            self.publish("esp32watch/health/heartbeat", heartbeat)
+            self.publish("esp32watch/health/sp02", sp02)
+            self.publish("esp32watch/health/steps", steps)
+            self.publish("esp32watch/health/activity", activity)
+            self.publish("esp32watch/data/battery", battery)
+            battery = 3.7 + random.randint(-1, 1)
+            steps += 1
+            heartbeat = 80 + random.randint(-10, 20)
+            sp02 = 99 + random.randint(-1, 1)
+            if random.randint(0, 1) == 0:
+                activity = "walking"
+            else:
+                activity = "standing"
+            time.sleep(2)
+
+# tesing web page and mqtt system with articial values
+class testWebPageRawData(mqtt.Client):
+    def on_connect(self, mqttc, obj, flags, rc):
+        print("rc: "+str(rc))
+
+    def on_connect_fail(self, mqttc, obj):
+        print("Connect failed")
+
+    def on_publish(self, mqttc, obj, mid):
+        print("message published, id: " + str(mid))
+
+    def run(self):
+        self.connect("127.0.0.1", 1883, 60)
+        red = 1200
+        ir = 2100
+        accel = 1.0
+        while True:            
+            self.publish("esp32watch/data/pedometer/accel", accel)
+            self.publish("esp32watch/data/oximeter/red", red)
+            self.publish("esp32watch/data/oximeter/ir", ir)
+            accel = 1.0 + round(random.uniform(-0.3, 0.3), 3)
+            red = 1200 + random.randint(-100, 100)
+            ir = 2100 + random.randint(-100, 100)
+            time.sleep(0.1)
 
 
 
 if __name__ == "__main__":
-    sub_client = mqttSub()
-    pub_client = mqttPub()
-    sub=threading.Thread(target=sub_client.run)
-    pub=threading.Thread(target=pub_client.run)
-    sub.start()
-    pub.start()
+    #sub_client = mqttSub()
+    #pub_client = mqttPub()
+    #sub=threading.Thread(target=sub_client.run)
+    #pub=threading.Thread(target=pub_client.run)
+    #sub.start()
+    #pub.start()
+
+    # for testing
+    test_client_activity = testWebPageActivityData()
+    test_client_data = testWebPageRawData()
+    test_activity = threading.Thread(target=test_client_activity.run)
+    test_data = threading.Thread(target=test_client_data.run)
+    test_activity.start()
+    test_data.start()

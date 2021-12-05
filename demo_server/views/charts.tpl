@@ -8,6 +8,7 @@ copies or substantial portions of the Software. -->
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script  src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
   <style>
     body {
       min-width: 310px;
@@ -117,7 +118,7 @@ copies or substantial portions of the Software. -->
   <h2>ESP Health Watch</h2>
   <div id="watch-face" class="watch-info">
     <div class="line1">
-      <div id="heart-beat" class="heart-beat-info">
+      <div id="heartbeat" class="heart-beat-info">
         Heart Beat Rate: 149 bpm
       </div>
       <div id="oxygentation" class="oxygentation-info">
@@ -125,30 +126,36 @@ copies or substantial portions of the Software. -->
       </div>
     </div>
     <div class="line2">
-      <div class="clock-info">00:00:00</div>
+      <div class="clock-info" id="clock">00:00:00</div>
     </div>
     <div class=line3>
-      <div class="date-info">Monday, Novemeber 9 2021</div>
+      <div class="date-info" id="date">Monday, Novemeber 9 2021</div>
     </div>
     <div class=line4>
-      <div class="activity-info">Activity: Sitting</div>
-      <div class="battery-info">Battery: 3.8V</div>
+      <div class="activity-info" id="activity">Activity: Sitting</div>
+      <div class="battery-info" id="battery">Battery: 3.8V</div>
     </div>
     <div class="line5">
-      <div class="steps-info">Step: 18,390</div>
+      <div class="steps-info" id="steps">Step: 18,390</div>
     </div>
   </div>
   <div id="watch-report" class="watch-button-record">
     <button type="button" class="record-button">Record Data</button>
   </div>
-  <div id="chart-temperature" class="container"></div>
-  <div id="chart-humidity" class="container"></div>
-  <div id="chart-pressure" class="container"></div>
+  <div id="chart-accel" class="container"></div>
+  <div id="chart-red" class="container"></div>
+  <div id="chart-ir" class="container"></div>
 </body>
+
 <script>
-var chartT = new Highcharts.Chart({
-  chart:{ renderTo : 'chart-temperature' },
-  title: { text: 'BME280 Temperature' },
+// Correct date
+var date = new Date(); 
+document.getElementById("date").innerHTML = "Thursday, December " + date.getDate() + " " + date.getFullYear();
+
+/// Chart Stuff
+var chartAccel = new Highcharts.Chart({
+  chart:{ renderTo : 'chart-accel' },
+  title: { text: 'Accelerometer' },
   series: [{
     showInLegend: false,
     data: []
@@ -163,32 +170,14 @@ var chartT = new Highcharts.Chart({
     dateTimeLabelFormats: { second: '%H:%M:%S' }
   },
   yAxis: {
-    title: { text: 'Temperature (Celsius)' }
-    //title: { text: 'Temperature (Fahrenheit)' }
+    title: { text: 'Accel Magnitude' }
   },
   credits: { enabled: false }
 });
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      var x = (new Date()).getTime(),
-          y = parseFloat(this.responseText);
-      //console.log(this.responseText);
-      if(chartT.series[0].data.length > 40) {
-        chartT.series[0].addPoint([x, y], true, true, true);
-      } else {
-        chartT.series[0].addPoint([x, y], true, false, true);
-      }
-    }
-  };
-  xhttp.open("GET", "/temperature", true);
-  xhttp.send();
-}, 30000 ) ;
 
-var chartH = new Highcharts.Chart({
-  chart:{ renderTo:'chart-humidity' },
-  title: { text: 'BME280 Humidity' },
+var chartRed = new Highcharts.Chart({
+  chart:{ renderTo:'chart-red' },
+  title: { text: 'Red Light' },
   series: [{
     showInLegend: false,
     data: []
@@ -203,31 +192,14 @@ var chartH = new Highcharts.Chart({
     dateTimeLabelFormats: { second: '%H:%M:%S' }
   },
   yAxis: {
-    title: { text: 'Humidity (%)' }
+    title: { text: 'Voltage (mV)' }
   },
   credits: { enabled: false }
 });
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      var x = (new Date()).getTime(),
-          y = parseFloat(this.responseText);
-      //console.log(this.responseText);
-      if(chartH.series[0].data.length > 40) {
-        chartH.series[0].addPoint([x, y], true, true, true);
-      } else {
-        chartH.series[0].addPoint([x, y], true, false, true);
-      }
-    }
-  };
-  xhttp.open("GET", "/humidity", true);
-  xhttp.send();
-}, 30000 ) ;
 
-var chartP = new Highcharts.Chart({
-  chart:{ renderTo:'chart-pressure' },
-  title: { text: 'BME280 Pressure' },
+var chartIR = new Highcharts.Chart({
+  chart:{ renderTo:'chart-ir' },
+  title: { text: 'IR Light' },
   series: [{
     showInLegend: false,
     data: []
@@ -243,26 +215,94 @@ var chartP = new Highcharts.Chart({
     dateTimeLabelFormats: { second: '%H:%M:%S' }
   },
   yAxis: {
-    title: { text: 'Pressure (hPa)' }
+    title: { text: 'Voltage (mV)' }
   },
   credits: { enabled: false }
 });
-setInterval(function ( ) {
-  var xhttp = new XMLHttpRequest();
-  xhttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      var x = (new Date()).getTime(),
-          y = parseFloat(this.responseText);
-      //console.log(this.responseText);
-      if(chartP.series[0].data.length > 40) {
-        chartP.series[0].addPoint([x, y], true, true, true);
-      } else {
-        chartP.series[0].addPoint([x, y], true, false, true);
-      }
+
+// MQTT Client
+var reconnectTimeout = 2000;
+var host = '127.0.0.1';
+var port = 80;
+// Create a client instace
+client  = new Paho.MQTT.Client(host, port, '', 'webpage');
+// set callback handlers
+client.onConnectLost = onConnectionLost;
+client.onMessageArrived = onMessageArrived;
+// Connect to broker
+client.connect({onSuccess:onConnect});
+// called when the client connects
+function onConnect(){
+  console.log('onConnect');
+  client.subscribe('esp32watch/health/heartbeat');
+  client.subscribe('esp32watch/health/sp02');
+  client.subscribe('esp32watch/health/steps');
+  client.subscribe('esp32watch/health/activity');
+  client.subscribe('esp32watch/data/battery');
+  client.subscribe('esp32watch/data/pedometer/accel');
+  client.subscribe('esp32watch/data/oximeter/red');
+  client.subscribe('esp32watch/data/oximeter/ir');
+};
+
+// called when the client losses its connection
+function onConnectionLost(responseObject){
+  if (responseObject.errorCode !== 0){
+    console.log("onConnectionLost:" + responseObject.errorMessage);
+  }
+};
+
+// called when a message arrives
+function onMessageArrived(message){
+  console.log("Destination:" + message.destinationName);
+  console.log("Message:" + message.payloadString);
+  if (message.destinationName == 'esp32watch/health/heartbeat'){
+
+  } else if (message.destinationName == 'esp32watch/health/sp02'){
+    document.getElementById("heartbeat").innerHTML = "Heart Beat Rate: " + message.payloadString + " bpm";
+  } else if (message.destinationName == 'esp32watch/health/steps'){
+    document.getElementById("steps").innerHTML = "Steps: " + message.payloadString;
+  } else if (message.destinationName == 'esp32watch/health/sp02'){
+    document.getElementById("oxygentation").innerHTML = "Sp02: " + message.payloadString + "%";
+  } else if (message.destinationName == 'esp32watch/health/activity'){
+    document.getElementById("activity").innerHTML = "Activity: " + message.payloadString;
+  } else if (message.destinationName == 'esp32watch/data/battery'){
+    document.getElementById("battery").innerHTML = "Battery: " + message.payloadString + " V";
+  } else if (message.destinationName == 'esp32watch/data/pedometer/accel'){
+    var x = (new Date()).getTime();
+    var y = parseFloat(message.payloadString);
+          
+    if(chartAccel.series[0].data.length > 40) {
+      chartAccel.series[0].addPoint([x, y], true, true, true);
+    } else {
+      chartAccel.series[0].addPoint([x, y], true, false, true);
     }
-  };
-  xhttp.open("GET", "/pressure", true);
-  xhttp.send();
-}, 30000 ) ;
+  } else if (message.destinationName == 'esp32watch/data/oximeter/red'){
+    var x = (new Date()).getTime();
+    var y = parseFloat(message.payloadString);
+          
+    if(chartRed.series[0].data.length > 40) {
+      chartRed.series[0].addPoint([x, y], true, true, true);
+    } else {
+      chartRed.series[0].addPoint([x, y], true, false, true);
+    }
+  } else if (message.destinationName == 'esp32watch/data/oximeter/ir'){
+    var x = (new Date()).getTime();
+    var y = parseFloat(message.payloadString);
+          
+    if(chartIR.series[0].data.length > 40) {
+      chartIR.series[0].addPoint([x, y], true, true, true);
+    } else {
+      chartIR.series[0].addPoint([x, y], true, false, true);
+    }
+  } else {
+    console.error("Bad DestinationName");
+  }
+};
+
+setInterval(function(){
+  var time = new Date();
+  document.getElementById("clock").innerHTML = time.getHours() + ":" + time.getMinutes() + ":" + time.getSeconds()
+}, 500);
+
 </script>
 </html>

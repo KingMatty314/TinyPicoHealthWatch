@@ -1,15 +1,15 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
 #include <time.h>
 #include <TinyPICO.h>
 #include <I2Cdev.h>
 #include <MPU6050.h>
 #include <steps_counter.h>
-#include <optical_oximeter.h>
+#include <MAX30105.h>
 #include <FreeRTOS.h>
+#include <stdio.h>
+#include <esp32-hal-cpu.h>
 
 
 // Arduino Wire library is required if I2Cdev I2CDEV_ARDUINO_WIRE implementation
@@ -30,11 +30,11 @@
 # define STACK_SIZE 1024
 
 // WiFi
-const char* ssid = "";
-const char* password = "";
+const char* ssid = "UWB_Network";
+const char* password = "123456789";
 
 // Networking
-//const char* server = "192.168.10.100";
+const char* server = "192.168.10.100";
 WiFiClient espClient;
 PubSubClient client(espClient);
 unsigned long timeStampAccel = millis();
@@ -48,13 +48,12 @@ tm timeinfo;
 time_t now;
 
 // Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
-TinyPICO tp = TinyPICO();
+//TinyPICO tp = TinyPICO();
 MPU6050 accelgyro;
-Pedometer pedometer = Pedometer(accelgyro);
-Oximeter oximeter = Oximeter();
+//Pedometer pedometer = Pedometer(accelgyro);
+MAX30105 oximeterSensor;
 
-int16_t ax, ay, az;
+int16_t ax, ay, az, gx, gy, gz;
 
 float accel_x, accel_y, accel_z;
 
@@ -65,13 +64,6 @@ int current_steps = 0;  // Tracks number of steps from current sampling period
 
 // Global Oximeter Sensor Variable
 
-const int RedPin = 4;
-const int IRPin = 5;
-const int freq = 5000;
-const int RedChannel = 4;
-const int IRChannel = 0;
-const int RedResolution = 10;
-const int IRResolution = 10;
 const int ButtonPin = 14;
 bool recordingState = false;
 
@@ -88,7 +80,7 @@ void recordButttonState()
     while (digitalRead(ButtonPin) == HIGH);
   }
 }
-
+/*
 void connectToNetwork()
 {
   WiFi.begin(ssid, password);
@@ -100,95 +92,30 @@ void connectToNetwork()
   Serial.println("Connected to network"); 
 }
 
-void scanNetworks()
-{
-  int numberOfNetworks = WiFi.scanNetworks();
-  Serial.print("Number of networks found: ");
-  Serial.println(numberOfNetworks);
- 
-  for (int i = 0; i < numberOfNetworks; i++) {
- 
-    Serial.print("Network name: ");
-    Serial.println(WiFi.SSID(i));
- 
-    Serial.print("Signal strength: ");
-    Serial.println(WiFi.RSSI(i));
- 
-    Serial.print("MAC address: ");
-    Serial.println(WiFi.BSSIDstr(i));
+int byteArrayToInt(byte *data, int startIndex, int byteCount){
+  int value = 0;
+  for (int i = 0; i < byteCount; i++){
+    int shift = i * 8;
+    value += data[startIndex + i] << shift;
   }
-}
-
-void printLocalTime()
-{
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
-  }
-  Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-}
-
-void getTimeUpdate(unsigned long sec)
-{
-  tm *ptm;
-  if ((millis() - lastEntryTime) < (1000*sec)){
-    now = lastNTPtime + (int)(millis() - lastEntryTime) / 1000;
-  } else {
-    lastEntryTime = millis();
-    lastNTPtime = time(&now);
-    now = lastNTPtime;
-  }
-  ptm = localtime(&now);
-  timeinfo = *ptm;
-}
-
-void updateMainDisplay()
-{
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  // Display heart rate
-  display.setCursor(0, 0);
-  display.println("HR:165 bpm");
-  // Display oxygenation
-  display.setCursor(SCREEN_WIDTH-60, 0);
-  display.println("Sp02: 98%");
-  // Activity Level and steps
-  display.setCursor(0, SCREEN_HEIGHT-20);
-  display.println("Sitting");
-  display.setCursor(0, SCREEN_HEIGHT-10);
-  display.println("Steps:13,444");
-  // Battery and Wifi Status
-  display.setCursor(SCREEN_WIDTH-50, SCREEN_HEIGHT-10);
-  display.println("Bat:40%");
-  display.setCursor(SCREEN_WIDTH-40, SCREEN_HEIGHT-20);
-  display.println("WiFi-C");
-  // Display time
-  display.setTextSize(1);
-  if(!getLocalTime(&timeinfo)){
-    display.setCursor(20, 25);
-    display.println("Failed to obtain time");
-  } else {
-    display.setCursor(20, 20);
-    display.println(&timeinfo, "%B %d %Y");
-    display.setCursor(35, 30);
-    display.println(&timeinfo, "%H:%M:%S");
-  }
-  display.display(); 
+  return value;
 }
 
 void sendAccel(float ax, float ay, float az)
 {
+  float accel = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
   float dur = (float) (millis() - timeStampAccel) / 1000.0;
-  char char_accel_x[8], char_accel_y[8], char_accel_z[8], time[8];
+  char char_accel_x[8], char_accel_y[8], char_accel_z[8], char_accel[8], time[8];
   dtostrf(dur, 1, 2, time);
   dtostrf(ax, 1, 2, char_accel_x);
   dtostrf(ay, 1, 2, char_accel_y);
+  dtostrf(az, 1, 2, char_accel_z);
   dtostrf(az, 1, 2, char_accel_z);
   client.publish("esp32watch/data/pedometer/time", time);
   client.publish("esp32watch/data/pedometer/accel_x", char_accel_x);
   client.publish("esp32watch/data/pedometer/accel_y", char_accel_y);
   client.publish("esp32watch/data/pedometer/accel_z", char_accel_z);
+  client.publish("esp32watch/data/pedometer/accel", char_accel);
   timeStampAccel = millis();
 }
 
@@ -239,9 +166,10 @@ void reconnect() {
     }
   }
 }
-
+*/
 void setup() 
 {
+  setCpuFrequencyMhz(80);
   Serial.begin(115200);
   // Setup push button
   pinMode(ButtonPin, INPUT);
@@ -265,35 +193,46 @@ void setup()
   accelgyro.CalibrateGyro(10);
 
   //Connect tow WiFi
-  //scanNetworks();
   //connectToNetwork();
   //Serial.print("Mac Address: ") ;Serial.println(WiFi.macAddress());
   //Serial.print("IP: "); Serial.println(WiFi.localIP());
-  
-  // Grab time
-  //configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  //lastNTPtime = time(&now);
-  //lastEntryTime = millis();
-
-  // Setup LED PWM
-  ledcSetup(RedChannel, freq, RedResolution);
-  ledcSetup(IRChannel, freq, IRResolution);
-  ledcAttachPin(RedPin, RedChannel);
-  ledcAttachPin(IRPin, IRChannel);
-
-  // Configure Screen
-  //if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3D for 128x64
-  //  Serial.println(F("SSD1306 allocation failed"));
-  //  for(;;);
-  //}
 
   // Connect to mqtt
   //client.setServer(server, 1883);
+  //client.subscribe("esp32watch/data/time/hr");
+  //client.subscribe("esp32watch/data/time/min");
+  //client.subscribe("esp32watch/data/time/sec");
+  //client.subscribe("esp32watch/data/time/day-of-week");
+  //client.subscribe("esp32watch/data/time/month");
+  //client.subscribe("esp32watch/data/time/day");
+  //client.subscribe("esp32watch/data/time/year");
+  //client.setCallback(ClockSynchronizationCallback);
+
+  //if (!client.connected()) {
+  //  Serial.println("Connecting MQTT Broker");
+  //  reconnect();
+  //}
+  //client.loop();
+
+  // Oximeter Sensor
+  if (!oximeterSensor.begin(Wire, I2C_SPEED_FAST)){
+    Serial.println("MAX30105 oximeter module was not found. Please check wiriing/power. ");
+  }
+
+  byte ledBrightness = 0x7f;
+  byte sampleRate = 50;
+  byte ledMode = 2;
+  byte samapleAverage = 1;
+  int pulseWidth = 411;
+  int adcRange = 16384;
+  oximeterSensor.setup(ledBrightness, samapleAverage, ledMode, sampleRate, pulseWidth, adcRange);
 }
 
-void UpdateStepTask(void *pvParameters){
-  if (accelgyro.testConnection()){
-    unsigned long StartTime = millis();
+/*
+/// RTOS Task Updates Users Step from Watch Accelerometer
+void UpdateStepCounterTask(void *pvParameters){
+  while (1){
+    unsigned long StartTime = millis();         // Comment out future
     unsigned long ElapsedTime = 0;
     current_steps = pedometer.count_steps();
     ElapsedTime = millis() - StartTime;
@@ -301,36 +240,66 @@ void UpdateStepTask(void *pvParameters){
   }
 }
 
-void loop() {
-  //if (!client.connected()) {
-  //  reconnect();
- // }
-  //client.loop();
+/// RTOS Task Updates LCD Display on Watch Face
+void DisplayLCDInfoTask(void *pvParameters){
+  while(1){
+    Serial.println("Displaying Data on Display");
+  }
+}
 
+/// RTOS Task Updates Oximeter data includind heartbeat rate and oxygenation percentage
+void UpdateStepOximeter(void *pvParameters){
+  while(1){
+
+  }
+
+}
+
+/// RTOS Task reporting all raw sensor data to MQTT broker
+void ReportRawData(void *pvParameters){
+  while(1){
+
+  }
+
+}
+
+/// RTOS Task reporting health sensor data to MQTT broker
+void ReportHealthSensorData(void *pvParameter){
+  while(1){
+
+  }
+}
+
+/// RTOS Task Loop MQTT Client to listen to Subsriber data from broker
+void ListenBrokerSubsriberData(void *pvParameter){
+  //while(1){
+    client.loop();
+  //}
+}
+*/
+
+void loop() {
   // Toggle between recording state and non-recording state
   //recordButttonState();
-
-  //  get step measurements from device
-
-  //Serial.print("X:"); Serial.print(accel_x); Serial.print(" ");
-  //Serial.print("Y:"); Serial.print(accel_y); Serial.print(" ");
-  //Serial.print("Z:"); Serial.println(accel_z); 
-
+  //if (recordingState){
+  //  Serial.println("Recording State Active");
+  //} else {
+  //  Serial.println("Normal Display Active");
+ // }
   
-  //int brightnessRed = (int)(pow(2, RedResolution)-1);
-  //int brightnessIR = (int)(pow(2, IRResolution)-1);
-  //ledcWrite(RedChannel, brightnessRed);
-  //ledcWrite(IRChannel, brightnessIR);
-  //delay(500);
+  oximeterSensor.check();
+  while (oximeterSensor.available()){
+    int32_t red = oximeterSensor.getFIFORed();
+    int32_t ir = oximeterSensor.getFIFOIR();
+    if (red >50000){
+      Serial.print(red); Serial.print(", "); Serial.println(ir);
+    }
+    // read next set of samples
+    oximeterSensor.nextSample();  
+  }
+  
 
-  //int analogRed = analogRead(33);
-  //int analogIR = analogRead(32);
 
-  //Serial.print("Red Brightness Output: "); Serial.print(brightnessRed);
-  //Serial.println(analogRed);
-  //Serial.print("ir: "); Serial.println(analogIR);
-  //Serial.print("IR Brightness Output: "); Serial.print(brightnessIR);
-  //Serial.print(" IR Voltage Value: "); Serial.print(analogIR); Serial.println("mV");
 
   // Battery
   //float voltage = tp.GetBatteryVoltage();
@@ -341,6 +310,7 @@ void loop() {
   //printLocalTime();
   //updateMainDisplay();
 
-  // Battery stuff
-  //delay(1000);
+
+  //ListenBrokerSubsriberData();
+  delay(20);
 }
