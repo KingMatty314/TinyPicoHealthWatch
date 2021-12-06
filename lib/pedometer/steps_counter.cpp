@@ -77,10 +77,13 @@ int Pedometer::find_peaks(float* accel_der){
     return peaks;
 }
 
-void Pedometer::add_data(float ax, float ay, float az){
+float Pedometer::add_data(float ax, float ay, float az){
     if (!is_buffer_full()){
-        accel_buffer[index] = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
+        float accel;
+        accel = sqrt(pow(ax, 2) + pow(ay, 2) + pow(az, 2));
+        accel_buffer[index] = accel;
         index += 1;
+        return accel;
     }
 }
 

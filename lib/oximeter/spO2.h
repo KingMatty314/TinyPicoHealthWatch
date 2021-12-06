@@ -2,8 +2,8 @@
 #define _spO2_H_
 
 #define PI 3.141592653589793238
-#define SAMPLING_FREQ 50
-#define SAMPLING_PER 0.02
+#define SAMPLING_FREQ_OXYG 50
+#define SAMPLING_PER_OXYG 0.02
 #define SAMPLES_OXYG 1500
 
 class Oxygenation {

@@ -162,7 +162,7 @@ var chartAccel = new Highcharts.Chart({
   }],
   plotOptions: {
     line: { animation: false,
-      dataLabels: { enabled: true }
+      dataLabels: { enabled: false }
     },
     series: { color: '#059e8a' }
   },
@@ -184,7 +184,7 @@ var chartRed = new Highcharts.Chart({
   }],
   plotOptions: {
     line: { animation: false,
-      dataLabels: { enabled: true }
+      dataLabels: { enabled: false }
     }
   },
   xAxis: {
@@ -206,7 +206,7 @@ var chartIR = new Highcharts.Chart({
   }],
   plotOptions: {
     line: { animation: false,
-      dataLabels: { enabled: true }
+      dataLabels: { enabled: false }
     },
     series: { color: '#18009c' }
   },
@@ -268,32 +268,21 @@ function onMessageArrived(message){
   } else if (message.destinationName == 'esp32watch/data/battery'){
     document.getElementById("battery").innerHTML = "Battery: " + message.payloadString + " V";
   } else if (message.destinationName == 'esp32watch/data/pedometer/accel'){
-    var x = (new Date()).getTime();
+    var x = (new Date()).getSeconds();
     var y = parseFloat(message.payloadString);
-          
-    if(chartAccel.series[0].data.length > 40) {
-      chartAccel.series[0].addPoint([x, y], true, true, true);
-    } else {
-      chartAccel.series[0].addPoint([x, y], true, false, true);
-    }
+    var shift = series[0].data.length > 40;
+    chartAccel.series[0].addPoint([x, y], true, true, shift);
+    
   } else if (message.destinationName == 'esp32watch/data/oximeter/red'){
-    var x = (new Date()).getTime();
+    var x = (new Date()).getSeconds();
     var y = parseFloat(message.payloadString);
-          
-    if(chartRed.series[0].data.length > 40) {
-      chartRed.series[0].addPoint([x, y], true, true, true);
-    } else {
-      chartRed.series[0].addPoint([x, y], true, false, true);
-    }
+    var shift = series[0].data.length > 40;
+      chartRed.series[0].addPoint([x, y], true, false, shift);
   } else if (message.destinationName == 'esp32watch/data/oximeter/ir'){
-    var x = (new Date()).getTime();
+    var x = (new Date()).getSeconds();
     var y = parseFloat(message.payloadString);
-          
-    if(chartIR.series[0].data.length > 40) {
-      chartIR.series[0].addPoint([x, y], true, true, true);
-    } else {
-      chartIR.series[0].addPoint([x, y], true, false, true);
-    }
+    var shift = series[0].data.length > 40
+    chartIR.series[0].addPoint([x, y], true, false, shift);
   } else {
     console.error("Bad DestinationName");
   }

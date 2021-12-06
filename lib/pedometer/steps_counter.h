@@ -34,7 +34,7 @@ class Pedometer{
 
     public:
         Pedometer();
-        void add_data(float ax, float ay, float az);
+        float add_data(float ax, float ay, float az);
         bool is_buffer_full();
         int get_count_steps();
 };
