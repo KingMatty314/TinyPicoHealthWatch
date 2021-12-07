@@ -174,7 +174,7 @@ void SendDataOverMQTTCommunication(void *pvParameters){
     ///////// Synchronication Check ///////////
     timeStampOld = timeStamp;
     timeStamp = millis();
-    Serial.print("Task2 Dur: "); Serial.println(timeStamp - timeStampOld);
+    //Serial.print("Task2 Dur: "); Serial.println(timeStamp - timeStampOld);
   }
 }
 
@@ -206,6 +206,7 @@ void UpdateHealthWatchData(void *pvParameters){
       while (oximeterSensor.available()){
         red = oximeterSensor.getFIFORed();
         ir = oximeterSensor.getFIFOIR();
+        Serial.print(ir); Serial.print(", "); Serial.println(red);
         //temp = oximeterSensor.readTemperature();
         if (red > RedLightThreshold && ir > IRLightThreshold){
           // light is above threshold save
@@ -289,7 +290,7 @@ void UpdateHealthWatchData(void *pvParameters){
     ///////// Synchronication Check ///////////
     timeStampOld = timeStamp;
     timeStamp = millis();
-    Serial.print("Task1 Dur: "); Serial.println(timeStamp - timeStampOld);
+    //Serial.print("Task1 Dur: "); Serial.println(timeStamp - timeStampOld);
     
 
     vTaskDelay(10/portTICK_PERIOD_MS);
